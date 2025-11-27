@@ -1,0 +1,8 @@
+services:
+  namaz-bot:
+    build: .
+    container_name: namaz_telegram_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+
