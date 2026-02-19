@@ -2,10 +2,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime, timedelta
 import pytz
+import logging
 from config import TIMEZONE, NOTIFICATION_OFFSET, NAMAZ_NAMES
 from parser import NamazParser
 from database import Database
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 class NotificationScheduler:
     def __init__(self, bot, db):
@@ -38,6 +41,13 @@ class NotificationScheduler:
             'interval',
             hours=1,
             id='clear_old_jobs'
+        )
+        
+        # Автоматическая очистка старых уведомлений каждый день в 03:00
+        self.scheduler.add_job(
+            self.cleanup_old_notifications,
+            CronTrigger(hour=3, minute=0),
+            id='cleanup_notifications'
         )
         
         # Первоначальное обновление расписания
@@ -198,9 +208,41 @@ class NotificationScheduler:
         """Отправляет уведомление пользователю"""
         try:
             message = f"🕌 Через {offset} минут намаз {namaz_name} в {namaz_time}"
-            await self.bot.send_message(chat_id=user_id, text=message)
+            sent_message = await self.bot.send_message(chat_id=user_id, text=message)
+            # Сохраняем message_id уведомления в БД
+            await self.db.save_message(sent_message.message_id, user_id, 'notification')
         except Exception as e:
             print(f"Ошибка отправки уведомления пользователю {user_id}: {e}")
+    
+    async def cleanup_old_notifications(self):
+        """Удаляет старые уведомления (старше 2 дней)"""
+        try:
+            # Получаем список старых сообщений (старше 2 дней)
+            old_messages = await self.db.get_old_messages(days=2)
+            
+            if not old_messages:
+                print("Нет старых уведомлений для удаления")
+                return
+            
+            deleted_count = 0
+            failed_count = 0
+            
+            for message_id, user_id in old_messages:
+                try:
+                    await self.bot.delete_message(chat_id=user_id, message_id=message_id)
+                    deleted_count += 1
+                except Exception as e:
+                    # Сообщение уже удалено или недоступно
+                    failed_count += 1
+                    logger.debug(f"Не удалось удалить сообщение {message_id} для пользователя {user_id}: {e}")
+            
+            # Удаляем из БД все сообщения (включая те, что не удалось удалить)
+            await self.db.delete_messages(old_messages)
+            
+            print(f"✅ Автоочистка: удалено {deleted_count} уведомлений, не удалось {failed_count}")
+            
+        except Exception as e:
+            print(f"❌ Ошибка автоочистки уведомлений: {e}")
     
     def stop(self):
         """Останавливает планировщик"""

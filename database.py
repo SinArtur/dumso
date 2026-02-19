@@ -31,6 +31,22 @@ class Database:
                     PRIMARY KEY (year, month, day)
                 )
             ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS messages (
+                    message_id INTEGER,
+                    user_id INTEGER,
+                    message_type TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (message_id, user_id)
+                )
+            ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS pinned_messages (
+                    user_id INTEGER PRIMARY KEY,
+                    message_id INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
             await db.commit()
     
     async def get_user(self, user_id):
@@ -165,4 +181,68 @@ class Database:
                 'new_users_month': new_users_month,
                 'offset_distribution': offset_distribution
             }
+    
+    async def save_message(self, message_id, user_id, message_type='notification'):
+        """Сохраняет message_id уведомления или другого сообщения"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'INSERT OR REPLACE INTO messages (message_id, user_id, message_type) VALUES (?, ?, ?)',
+                (message_id, user_id, message_type)
+            )
+            await db.commit()
+    
+    async def get_old_messages(self, days=2):
+        """Получает список старых сообщений (старше указанного количества дней)"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute('''
+                SELECT message_id, user_id FROM messages 
+                WHERE created_at < datetime('now', '-' || ? || ' days')
+                AND message_type = 'notification'
+            ''', (days,)) as cursor:
+                rows = await cursor.fetchall()
+                return [(row['message_id'], row['user_id']) for row in rows]
+    
+    async def delete_messages(self, message_ids_with_users):
+        """Удаляет сообщения из БД"""
+        if not message_ids_with_users:
+            return
+        async with aiosqlite.connect(self.db_path) as db:
+            for message_id, user_id in message_ids_with_users:
+                await db.execute(
+                    'DELETE FROM messages WHERE message_id = ? AND user_id = ?',
+                    (message_id, user_id)
+                )
+            await db.commit()
+    
+    async def get_user_messages(self, user_id, message_type='notification'):
+        """Получает все сообщения пользователя определенного типа"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                'SELECT message_id FROM messages WHERE user_id = ? AND message_type = ?',
+                (user_id, message_type)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [row['message_id'] for row in rows]
+    
+    async def save_pinned_message(self, user_id, message_id):
+        """Сохраняет message_id закрепленного сообщения"""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                'INSERT OR REPLACE INTO pinned_messages (user_id, message_id) VALUES (?, ?)',
+                (user_id, message_id)
+            )
+            await db.commit()
+    
+    async def get_pinned_message(self, user_id):
+        """Получает message_id закрепленного сообщения пользователя"""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                'SELECT message_id FROM pinned_messages WHERE user_id = ?',
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row['message_id'] if row else None
 

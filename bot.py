@@ -49,6 +49,9 @@ def get_main_keyboard():
         ],
         [
             InlineKeyboardButton("⏰ Настроить время", callback_data="set_time")
+        ],
+        [
+            InlineKeyboardButton("🗑️ Очистить уведомления", callback_data="clear_notifications")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -66,10 +69,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Выберите действие:"
     )
     
-    await update.message.reply_text(
+    # Отправляем сообщение с меню
+    sent_message = await update.message.reply_text(
         welcome_message,
         reply_markup=get_main_keyboard()
     )
+    
+    # Закрепляем сообщение
+    try:
+        await sent_message.pin(disable_notification=True)
+        # Сохраняем message_id закрепленного сообщения
+        await db.save_pinned_message(user_id, sent_message.message_id)
+        await db.save_message(sent_message.message_id, user_id, 'menu')
+    except Exception as e:
+        logger.error(f"Ошибка закрепления сообщения: {e}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатий на кнопки"""
@@ -225,6 +238,36 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Ошибка редактирования сообщения (back): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (back): {e}")
+    
+    elif query.data == "clear_notifications":
+        try:
+            # Получаем все message_id уведомлений пользователя
+            message_ids = await db.get_user_messages(user_id, 'notification')
+            
+            if not message_ids:
+                await query.answer("✅ Нет уведомлений для удаления", show_alert=False)
+                return
+            
+            # Удаляем сообщения
+            deleted_count = 0
+            for msg_id in message_ids:
+                try:
+                    await context.bot.delete_message(chat_id=user_id, message_id=msg_id)
+                    deleted_count += 1
+                except Exception as e:
+                    # Сообщение уже удалено или недоступно
+                    logger.debug(f"Не удалось удалить сообщение {msg_id}: {e}")
+            
+            # Удаляем из БД
+            await db.delete_messages([(msg_id, user_id) for msg_id in message_ids])
+            
+            await query.answer(
+                f"✅ Удалено {deleted_count} уведомлений",
+                show_alert=False
+            )
+        except Exception as e:
+            logger.error(f"Ошибка очистки уведомлений: {e}")
+            await query.answer("❌ Ошибка при удалении уведомлений", show_alert=False)
 
 async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /schedule"""
