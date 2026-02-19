@@ -126,7 +126,10 @@ class NotificationScheduler:
                 # Парсим время намаза
                 try:
                     namaz_hour, namaz_minute = map(int, namaz_time_str.split(':'))
-                    namaz_datetime = now.replace(hour=namaz_hour, minute=namaz_minute, second=0, microsecond=0)
+                    # Создаем datetime для времени намаза СЕГОДНЯ в правильном часовом поясе
+                    namaz_datetime = TIMEZONE.localize(
+                        datetime(now.year, now.month, now.day, namaz_hour, namaz_minute, 0)
+                    )
                     
                     # Вычисляем время уведомления
                     for user in subscribed_users:

@@ -100,7 +100,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(message, reply_markup=get_main_keyboard())
         except BadRequest as e:
             # Игнорируем ситуацию, когда сообщение не изменилось
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (today): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (today): {e}")
@@ -127,7 +129,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await query.edit_message_text(message, reply_markup=get_main_keyboard())
         except BadRequest as e:
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (tomorrow): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (tomorrow): {e}")
@@ -140,7 +144,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_main_keyboard()
             )
         except BadRequest as e:
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (subscribe): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (subscribe): {e}")
@@ -153,7 +159,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_main_keyboard()
             )
         except BadRequest as e:
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (unsubscribe): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (unsubscribe): {e}")
@@ -181,7 +189,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=reply_markup
             )
         except BadRequest as e:
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (set_time): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (set_time): {e}")
@@ -195,7 +205,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_main_keyboard()
             )
         except BadRequest as e:
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (time_*): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (time_*): {e}")
@@ -207,7 +219,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_main_keyboard()
             )
         except BadRequest as e:
-            if "Message is not modified" not in str(e):
+            if "Message is not modified" in str(e):
+                pass  # Тихо игнорируем
+            else:
                 logger.error(f"Ошибка редактирования сообщения (back): {e}")
         except Exception as e:
             logger.error(f"Неожиданная ошибка редактирования сообщения (back): {e}")
