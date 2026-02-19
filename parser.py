@@ -37,9 +37,13 @@ class NamazParser:
             for row in rows:
                 cols = row.find_all('td')
                 if len(cols) >= 9:  # Проверяем наличие всех колонок
-                    day = cols[0].get_text().strip()
-                    if day.isdigit():
-                        day_num = int(day)
+                    # Берем дату из третьей колонки (общий календарь), а не из первой (день Рамадана)
+                    # cols[0] - день Рамадана (1, 2, 3...)
+                    # cols[1] - день недели (чт., пт...)
+                    # cols[2] - дата по общему календарю (19, 20, 21...)
+                    day_str = cols[2].get_text().strip()
+                    if day_str.isdigit():
+                        day_num = int(day_str)
                         schedule[day_num] = {
                             'fajr': self._format_time(cols[3].get_text().strip()),
                             'sunrise': self._format_time(cols[4].get_text().strip()),
