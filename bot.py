@@ -1,12 +1,15 @@
 import asyncio
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from datetime import datetime, timedelta
+
 import pytz
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+
 from config import BOT_TOKEN, TIMEZONE, NAMAZ_NAMES, ADMIN_IDS, ADMIN_IDS
-from parser import NamazParser
 from database import Database
+from parser import NamazParser
 from scheduler import NotificationScheduler
 
 # Настройка логирования
@@ -91,9 +94,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 now = datetime.now(TIMEZONE)
                 schedule = await db.get_schedule(now.day, now.month, now.year)
                 message = format_schedule_message(schedule, "сегодня")
-            except:
+            except Exception:
                 message = "❌ Не удалось получить расписание. Попробуйте позже."
-        await query.edit_message_text(message, reply_markup=get_main_keyboard())
+        try:
+            await query.edit_message_text(message, reply_markup=get_main_keyboard())
+        except BadRequest as e:
+            # Игнорируем ситуацию, когда сообщение не изменилось
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (today): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (today): {e}")
     
     elif query.data == "tomorrow":
         try:
@@ -112,23 +122,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tomorrow_dt = now + timedelta(days=1)
                 schedule = await db.get_schedule(tomorrow_dt.day, tomorrow_dt.month, tomorrow_dt.year)
                 message = format_schedule_message(schedule, "завтра")
-            except:
+            except Exception:
                 message = "❌ Не удалось получить расписание. Попробуйте позже."
-        await query.edit_message_text(message, reply_markup=get_main_keyboard())
+        try:
+            await query.edit_message_text(message, reply_markup=get_main_keyboard())
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (tomorrow): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (tomorrow): {e}")
     
     elif query.data == "subscribe":
         await db.subscribe_user(user_id)
-        await query.edit_message_text(
-            "✅ Вы подписались на уведомления о намазах!",
-            reply_markup=get_main_keyboard()
-        )
+        try:
+            await query.edit_message_text(
+                "✅ Вы подписались на уведомления о намазах!",
+                reply_markup=get_main_keyboard()
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (subscribe): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (subscribe): {e}")
     
     elif query.data == "unsubscribe":
         await db.unsubscribe_user(user_id)
-        await query.edit_message_text(
-            "❌ Вы отписались от уведомлений о намазах.",
-            reply_markup=get_main_keyboard()
-        )
+        try:
+            await query.edit_message_text(
+                "❌ Вы отписались от уведомлений о намазах.",
+                reply_markup=get_main_keyboard()
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (unsubscribe): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (unsubscribe): {e}")
     
     elif query.data == "set_time":
         # Создаем клавиатуру для выбора времени
@@ -147,24 +175,42 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            "⏰ Выберите время напоминания до намаза:",
-            reply_markup=reply_markup
-        )
+        try:
+            await query.edit_message_text(
+                "⏰ Выберите время напоминания до намаза:",
+                reply_markup=reply_markup
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (set_time): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (set_time): {e}")
     
     elif query.data.startswith("time_"):
         offset = int(query.data.split("_")[1])
         await db.set_notification_offset(user_id, offset)
-        await query.edit_message_text(
-            f"✅ Время напоминания установлено: {offset} минут",
-            reply_markup=get_main_keyboard()
-        )
+        try:
+            await query.edit_message_text(
+                f"✅ Время напоминания установлено: {offset} минут",
+                reply_markup=get_main_keyboard()
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (time_*): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (time_*): {e}")
     
     elif query.data == "back":
-        await query.edit_message_text(
-            "Выберите действие:",
-            reply_markup=get_main_keyboard()
-        )
+        try:
+            await query.edit_message_text(
+                "Выберите действие:",
+                reply_markup=get_main_keyboard()
+            )
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                logger.error(f"Ошибка редактирования сообщения (back): {e}")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка редактирования сообщения (back): {e}")
 
 async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /schedule"""
