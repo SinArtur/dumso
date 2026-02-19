@@ -238,6 +238,42 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка получения статистики.")
 
+async def update_schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /update_schedule (только для администраторов)"""
+    user_id = update.effective_user.id
+    
+    # Проверка на администратора
+    if not ADMIN_IDS or user_id not in ADMIN_IDS:
+        await update.message.reply_text("❌ У вас нет доступа к этой команде.")
+        return
+    
+    try:
+        await update.message.reply_text("🔄 Обновляю расписание с сайта...")
+        
+        # Принудительно парсим сайт
+        schedule = parser.parse_schedule(force_refresh=True)
+        
+        if not schedule or len(schedule) == 0:
+            await update.message.reply_text("❌ Не удалось получить расписание с сайта.")
+            return
+        
+        # Сохраняем в БД
+        now = datetime.now(TIMEZONE)
+        await db.save_schedule(schedule, now.month, now.year)
+        
+        # Обновляем расписание в планировщике, если он запущен
+        if scheduler:
+            await scheduler.update_schedule_daily()
+        
+        await update.message.reply_text(
+            f"✅ Расписание успешно обновлено!\n"
+            f"📅 Получено расписание на {len(schedule)} дней для {now.month}/{now.year}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка обновления расписания: {e}")
+        await update.message.reply_text(f"❌ Ошибка обновления расписания: {e}")
+
 async def post_init(application: Application):
     """Инициализация после запуска бота"""
     global scheduler
@@ -266,6 +302,7 @@ def main():
     application.add_handler(CommandHandler("schedule", schedule_command))
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("update_schedule", update_schedule_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     
     # Запускаем бота
